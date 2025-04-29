@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <title>تبیان نسخه رایگان</title>
+  <link href="https://fonts.googleapis.com/css2?family=Vazirmatn&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <style>
+    body {
+      font-family: 'Vazirmatn', sans-serif;
+      background-color: #F5DEB3;
+      margin: 0;
+      padding: 20px;
+      text-align: center;
+    }
+    input, button, select {
+      margin: 10px;
+      padding: 12px;
+      font-size: 16px;
+      border-radius: 8px;
+      border: 1px solid #EE0000;
+      width: 90%;
+      max-width: 400px;
+      box-sizing: border-box;
+    }
+    button {
+      background-color: #1E1E1E;
+      color: white;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #EE0000;
+    }
+    #result {
+      background: #ffffff;
+      margin-top: 20px;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0px 0px 10px rgba(0,0,0,0.1);
+    }
+    .autocomplete-suggestions {
+      background: white;
+      border: 1px solid #ccc;
+      max-height: 150px;
+      overflow-y: auto;
+      z-index: 999;
+      position: relative;
+    }
+    .autocomplete-suggestions div {
+      padding: 10px;
+      cursor: pointer;
+    }
+    .autocomplete-suggestions div:hover {
+      background: #1E1E1E;
+      color: white;
+    }
+    .item {
+      position: relative;
+      margin-bottom: 20px;
+    }
+    .remove-btn {
+      background-color: red;
+      color: white;
+      border: none;
+      padding: 3px 7px;
+      position: up to the search field#dd6262;
+      left: 5px;
+      top: 5px;
+      border-radius: 50%;
+      cursor: pointer;
+      font-size: 14px;
+    }
+  </style>
+</head>
+<body>
+
+  <h1>تبیان نسخه رایگان</h1>
+
+  <input type="file" id="fileInput" accept=".xlsx" />
+  <div id="searchArea"></div>
+
+  <div>
+    <label>
+      <input type="checkbox" id="freeVersionCheckbox" onchange="calculateTotal()"> نسخه آزاد (۳۳۶۰۰ تومان)
+    </label>
+  </div>
+
+  <div id="result"></div>
+
+  <button onclick="saveToExcel()" id="saveBtn" style="display:none;">ذخیره</button>
+  <script>
+    let excelData = [];
+    let selectedItems = [];
+    let allSales = [];
+
+    document.getElementById('fileInput').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        const data = new Uint8Array(e.target.result);
+        const workbook = XLSX.read(data, {type: 'array'});
+        const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+        excelData = XLSX.utils.sheet_to_json(worksheet);
+        alert('فایل اکسل بارگذاری شد!');
+        addSearchField();
+      };
+      reader.readAsArrayBuffer(file);
+    });
+
+    function addSearchField() {
+      const searchArea = document.getElementById('searchArea');
+
+      const wrapper = document.createElement('div');
+      wrapper.classList.add('item');
+
+      const input = document.createElement('input');
+      input.placeholder = "جستجو کنید...";
+
+      const suggestionBox = document.createElement('div');
+      suggestionBox.classList.add('autocomplete-suggestions');
+
+      input.addEventListener('input', function() {
+        const value = input.value.toLowerCase();
+        suggestionBox.innerHTML = '';
+
+        if (!value) return;
+
+        const filtered = excelData.filter(row => row['محصول'] && row['محصول'].toLowerCase().includes(value));
+        filtered.forEach(item => {
+          const div = document.createElement('div');
+          div.textContent = item['محصول'];
+          div.onclick = function() {
+            input.value = item['محصول'];
+            suggestionBox.innerHTML = '';
+
+            const quantityInput = document.createElement('input');
+            quantityInput.placeholder = 'تعداد برای ' + item['محصول'];
+            quantityInput.type = 'number';
+            quantityInput.min = 1;
+
+            const removeBtn = document.createElement('button');
+            removeBtn.textContent = '×';
+            removeBtn.classList.add('remove-btn');
+
+            const selectedItem = {wrapper: wrapper, product: item['محصول'], price: item['قیمت'], quantityInput: quantityInput};
+
+            removeBtn.onclick = function() {
+              selectedItems = selectedItems.filter(i => i !== selectedItem);
+              wrapper.remove();
+              calculateTotal();
+            };
+
+            wrapper.appendChild(quantityInput);
+            wrapper.appendChild(removeBtn);
+
+            quantityInput.addEventListener('input', calculateTotal);
+
+            selectedItems.push(selectedItem);
+            calculateTotal();
+            addSearchField();
+          };
+          suggestionBox.appendChild(div);
+        });
+      });
+
+      wrapper.appendChild(input);
+      wrapper.appendChild(suggestionBox);
+      searchArea.appendChild(wrapper);
+    }
+
+    function calculateTotal() {
+      const resultDiv = document.getElementById('result');
+      let output = '';
+      let total = 0;
+
+      selectedItems.forEach(item => {
+        const quantity = parseInt(item.quantityInput.value) || 0;
+        const itemTotal = quantity * item.price;
+        output += `<div><b>${item.product}</b> - تعداد: ${quantity} - قیمت کل: ${itemTotal.toLocaleString()} تومان</div>`;
+        total += itemTotal;
+      });
+
+      const freeVersion = document.getElementById('freeVersionCheckbox').checked;
+      if (freeVersion) {
+        total += 33600;
+        output += `<div><b>نسخه آزاد</b> - قیمت: 33,600 تومان</div>`;
+      }
+
+      output += `<hr><h3>مجموع کل: ${total.toLocaleString()} تومان</h3>`;
+      resultDiv.innerHTML = output;
+
+      document.getElementById('saveBtn').style.display = selectedItems.length > 0 || freeVersion ? 'inline-block' : 'none';
+    }
+
+    function saveToExcel() {
+      const freeVersion = document.getElementById('freeVersionCheckbox').checked;
+
+      selectedItems.forEach(item => {
+        const quantity = parseInt(item.quantityInput.value) || 0;
+        const total = quantity * item.price;
+        allSales.push({
+          "محصول": item.product,
+          "تعداد": quantity,
+          "قیمت واحد": item.price,
+          "قیمت کل": total
+        });
+      });
+
+      if (freeVersion) {
+        allSales.push({
+          "محصول": "نسخه آزاد",
+          "تعداد": 1,
+          "قیمت واحد": 33600,
+          "قیمت کل": 33600
+        });
+      }
+
+      const ws = XLSX.utils.json_to_sheet(allSales);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, "فروش");
+      XLSX.writeFile(wb, `فروش_کل.xlsx`);
+
+      // Reset form
+      selectedItems = [];
+      document.getElementById('searchArea').innerHTML = '';
+      document.getElementById('result').innerHTML = '';
+      document.getElementById('saveBtn').style.display = 'none';
+      document.getElementById('freeVersionCheckbox').checked = false;
+      addSearchField();
+      alert('فروش ذخیره شد و فرم ریست شد!');
+    }
+  </script>
+</body>
+</html>
